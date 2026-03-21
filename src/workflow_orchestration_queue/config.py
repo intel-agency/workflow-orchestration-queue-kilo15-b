@@ -1,5 +1,6 @@
 """Configuration management using Pydantic Settings."""
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -7,12 +8,12 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Required settings
-    github_token: str
+    github_token: SecretStr
     github_repo: str  # format: "owner/repo"
     sentinel_bot_login: str
 
     # Optional settings
-    webhook_secret: str | None = None
+    webhook_secret: SecretStr | None = None
     sentinel_heartbeat_interval: int = 300
 
     model_config = {
