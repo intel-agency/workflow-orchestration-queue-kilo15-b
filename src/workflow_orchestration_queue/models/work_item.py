@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import enum
 import re
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -88,7 +88,8 @@ class WorkItem(BaseModel):
 
 # Secret patterns for credential sanitization
 # Each pattern is designed to match a specific type of secret/token
-_SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+# Using callable replacements where we need to preserve the separator
+_SECRET_PATTERNS: list[tuple[re.Pattern[str], str | Callable[[re.Match[str]], str]]] = [
     # GitHub Personal Access Token (classic)
     (re.compile(r"ghp_[A-Za-z0-9_]+"), "[REDACTED]"),
     # GitHub Server-to-Server Token
@@ -99,13 +100,31 @@ _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"github_pat_[A-Za-z0-9_]+"), "[REDACTED]"),
     # Bearer tokens (with flexible spacing)
     (re.compile(r"Bearer\s+[A-Za-z0-9_-]+"), "Bearer [REDACTED]"),
-    # Generic token assignments (token=, token:)
-    (re.compile(r"token[=:]\s*[A-Za-z0-9_-]+"), "token=[REDACTED]"),
     # OpenAI API keys (including sk-proj- format)
     (re.compile(r"sk-[A-Za-z0-9_-]+"), "[REDACTED]"),
     # ZhipuAI keys (approximate pattern - alphanumeric with possible dashes/underscores)
     (re.compile(r"(?:zhipu[_-]?|zm[_-]?)[A-Za-z0-9_-]{20,}"), "[REDACTED]"),
 ]
+
+
+def _redact_token_match(match: re.Match[str]) -> str:
+    """Replacement function that preserves the separator (=: or :=) in token patterns.
+
+    Args:
+        match: A regex match object for token patterns.
+
+    Returns:
+        The redacted string with the original separator preserved.
+    """
+    full_match = match.group(0)
+    # Find which separator was used
+    if ":" in full_match:
+        return "token: [REDACTED]"
+    return "token= [REDACTED]"
+
+
+# Pattern for generic token assignments (token=, token:) - uses callable replacement
+_TOKEN_PATTERN = re.compile(r"token[=:]\s*[A-Za-z0-9_-]+")
 
 
 def scrub_secrets(text: str) -> str:
@@ -122,7 +141,7 @@ def scrub_secrets(text: str) -> str:
         The sanitized string with all detected secrets replaced by [REDACTED].
 
     Example:
-        >>> scrub_secrets("Token: ghp_abc123xyz")
+        >>> scrub_secrets("Token: ghp_FAKE_TOKEN")
         'Token: [REDACTED]'
         >>> scrub_secrets("Authorization: Bearer secret_token_123")
         'Authorization: Bearer [REDACTED]'
@@ -141,5 +160,8 @@ def scrub_secrets(text: str) -> str:
     result = text
     for pattern, replacement in _SECRET_PATTERNS:
         result = pattern.sub(replacement, result)
+
+    # Handle token patterns with separator preservation
+    result = _TOKEN_PATTERN.sub(_redact_token_match, result)
 
     return result
