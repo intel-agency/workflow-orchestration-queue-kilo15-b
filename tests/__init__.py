@@ -1,1 +1,2 @@
-# Tests package
+# tests/__init__.py
+"""Test suite for workflow-orchestration-queue."""
