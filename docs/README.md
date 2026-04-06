@@ -5,6 +5,8 @@ This directory contains project documentation for the workflow-orchestration-que
 ## Documents
 
 - [Architecture Overview](architecture.md) - System design and component details
+- [Implementation Plan](implementation-plan.md) - Workflow issues remediation tasks
+- [Debrief Report](debrief-report.md) - Project-setup workflow execution review and lessons learned
 
 ## Related Documentation
 
