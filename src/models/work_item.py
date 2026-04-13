@@ -59,32 +59,37 @@ class WorkItem(BaseModel):
 
     Attributes:
         id: Unique identifier for the work item (string or integer).
+        issue_number: GitHub issue number for this work item.
         source_url: GitHub issue URL or source reference.
         context_body: Raw markdown body containing task context.
         target_repo_slug: Target repository in owner/repo format.
         task_type: Classification as PLAN or IMPLEMENT.
         status: Current state in the workflow.
-        metadata: Provider-specific data (e.g., issue_node_id).
+        node_id: GitHub GraphQL node ID for the issue.
+        metadata: Provider-specific data (extensible field).
 
     Example:
         >>> item = WorkItem(
         ...     id="issue-123",
+        ...     issue_number=123,
         ...     source_url="https://github.com/owner/repo/issues/123",
         ...     context_body="## Task\\nImplement feature X",
         ...     target_repo_slug="owner/repo",
         ...     task_type=TaskType.IMPLEMENT,
         ...     status=WorkItemStatus.QUEUED,
-        ...     metadata={"issue_node_id": "I_123"},
+        ...     node_id="I_123",
         ... )
     """
 
     id: str | int
+    issue_number: int
     source_url: str
     context_body: str
     target_repo_slug: str
     task_type: TaskType
     status: WorkItemStatus
-    metadata: dict[str, Any]
+    node_id: str | None = None
+    metadata: dict[str, Any] = {}
 
     model_config = ConfigDict(extra="forbid")
 
