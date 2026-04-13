@@ -177,48 +177,52 @@ class TestGitHubQueue:
         """Test updating status with a comment."""
         sample_work_item.status = WorkItemStatus.IN_PROGRESS
 
-        with patch.object(queue._client, "delete", new_callable=AsyncMock) as mock_delete:
-            with patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post:
-                mock_delete.return_value = MagicMock(status_code=200)
-                mock_post.return_value = MagicMock(status_code=201)
+        with (
+            patch.object(queue._client, "delete", new_callable=AsyncMock) as mock_delete,
+            patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_delete.return_value = MagicMock(status_code=200)
+            mock_post.return_value = MagicMock(status_code=201)
 
-                await queue.update_status(
-                    sample_work_item,
-                    WorkItemStatus.SUCCESS,
-                    comment="Task completed!",
-                )
+            await queue.update_status(
+                sample_work_item,
+                WorkItemStatus.SUCCESS,
+                comment="Task completed!",
+            )
 
-                # Should call delete for old label and post for new label + comment
-                assert mock_delete.call_count == 1
-                assert mock_post.call_count == 2  # label + comment
+            # Should call delete for old label and post for new label + comment
+            assert mock_delete.call_count == 1
+            assert mock_post.call_count == 2  # label + comment
 
         await queue.close()
 
     @pytest.mark.asyncio
     async def test_claim_task_success(self, queue: GitHubQueue, sample_work_item: WorkItem) -> None:
         """Test successful task claiming with assign-then-verify."""
-        with patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post:
-            with patch.object(queue._client, "get", new_callable=AsyncMock) as mock_get:
-                with patch.object(queue._client, "delete", new_callable=AsyncMock) as mock_delete:
-                    # Setup: assignment post succeeds
-                    mock_post.return_value = MagicMock(status_code=201)
+        with (
+            patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post,
+            patch.object(queue._client, "get", new_callable=AsyncMock) as mock_get,
+            patch.object(queue._client, "delete", new_callable=AsyncMock) as mock_delete,
+        ):
+            # Setup: assignment post succeeds
+            mock_post.return_value = MagicMock(status_code=201)
 
-                    # Setup: verify get shows correct assignee
-                    mock_get.return_value = MagicMock(
-                        status_code=200,
-                        json=lambda: {"assignees": [{"login": "test-bot"}]},
-                    )
+            # Setup: verify get shows correct assignee
+            mock_get.return_value = MagicMock(
+                status_code=200,
+                json=lambda: {"assignees": [{"login": "test-bot"}]},
+            )
 
-                    # Setup: label operations succeed
-                    mock_delete.return_value = MagicMock(status_code=200)
+            # Setup: label operations succeed
+            mock_delete.return_value = MagicMock(status_code=200)
 
-                    result = await queue.claim_task(
-                        sample_work_item,
-                        "sentinel-abc123",
-                        bot_login="test-bot",
-                    )
+            result = await queue.claim_task(
+                sample_work_item,
+                "sentinel-abc123",
+                bot_login="test-bot",
+            )
 
-                    assert result is True
+            assert result is True
 
         await queue.close()
 
@@ -227,24 +231,26 @@ class TestGitHubQueue:
         self, queue: GitHubQueue, sample_work_item: WorkItem
     ) -> None:
         """Test task claiming when another sentinel wins the race."""
-        with patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post:
-            with patch.object(queue._client, "get", new_callable=AsyncMock) as mock_get:
-                # Setup: assignment post succeeds
-                mock_post.return_value = MagicMock(status_code=201)
+        with (
+            patch.object(queue._client, "post", new_callable=AsyncMock) as mock_post,
+            patch.object(queue._client, "get", new_callable=AsyncMock) as mock_get,
+        ):
+            # Setup: assignment post succeeds
+            mock_post.return_value = MagicMock(status_code=201)
 
-                # Setup: verify get shows different assignee (race lost)
-                mock_get.return_value = MagicMock(
-                    status_code=200,
-                    json=lambda: {"assignees": [{"login": "other-sentinel"}]},
-                )
+            # Setup: verify get shows different assignee (race lost)
+            mock_get.return_value = MagicMock(
+                status_code=200,
+                json=lambda: {"assignees": [{"login": "other-sentinel"}]},
+            )
 
-                result = await queue.claim_task(
-                    sample_work_item,
-                    "sentinel-abc123",
-                    bot_login="test-bot",
-                )
+            result = await queue.claim_task(
+                sample_work_item,
+                "sentinel-abc123",
+                bot_login="test-bot",
+            )
 
-                assert result is False
+            assert result is False
 
         await queue.close()
 

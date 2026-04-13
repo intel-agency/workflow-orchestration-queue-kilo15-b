@@ -16,6 +16,7 @@ Environment Variables:
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import random
@@ -58,8 +59,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("OS-APOW-Sentinel")
 
-# Graceful shutdown flag
-_shutdown_requested = False
+
+# Graceful shutdown flag — mutable container avoids the global statement
+class _Shutdown:
+    """Simple mutable container for the shutdown flag."""
+
+    requested: bool = False
+
+
+_shutdown = _Shutdown()
 
 
 # --- Signal Handling ---
@@ -67,10 +75,9 @@ _shutdown_requested = False
 
 def _handle_signal(signum: int, frame) -> None:
     """Set shutdown flag on SIGTERM/SIGINT so the current task can finish."""
-    global _shutdown_requested
     sig_name = signal.Signals(signum).name
     logger.info(f"Received {sig_name} — will shut down after current task finishes")
-    _shutdown_requested = True
+    _shutdown.requested = True
 
 
 signal.signal(signal.SIGTERM, _handle_signal)
@@ -199,10 +206,8 @@ class Sentinel:
             )
         finally:
             heartbeat_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
             # Environment reset between tasks — stop container but keep for fast restart
             logger.info("Resetting environment (stop)")
@@ -212,13 +217,13 @@ class Sentinel:
         """Main polling loop that continuously fetches and processes tasks."""
         logger.info(f"Sentinel {SENTINEL_ID} entering polling loop (interval: {POLL_INTERVAL}s)")
 
-        while not _shutdown_requested:
+        while not _shutdown.requested:
             try:
                 tasks = await self.queue.fetch_queued_tasks()
                 if tasks:
                     logger.info(f"Found {len(tasks)} queued task(s).")
                     for task in tasks:
-                        if _shutdown_requested:
+                        if _shutdown.requested:
                             break
                         if await self.queue.claim_task(task, SENTINEL_ID, SENTINEL_BOT_LOGIN):
                             await self.process_task(task)

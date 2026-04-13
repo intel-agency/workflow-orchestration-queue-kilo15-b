@@ -1,4 +1,3 @@
-
 # ruff: noqa: PLC0415 - Imports inside test functions to test import paths
 
 """Comprehensive tests for work_item module.
